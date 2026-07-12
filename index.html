@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Óptica ERP System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 flex h-screen overflow-hidden text-gray-800">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-slate-900 text-white flex flex-col hidden md:flex">
+        <div class="h-16 flex items-center justify-center border-b border-slate-700 font-bold text-xl uppercase tracking-widest">Óptica ERP</div>
+        <nav class="flex-1 px-4 py-6 space-y-2">
+            <button onclick="app.loadView('dashboard')" class="w-full flex items-center px-4 py-3 bg-slate-800 rounded text-left hover:bg-blue-600 transition">Dashboard</button>
+            <button onclick="app.loadView('inventario')" class="w-full flex items-center px-4 py-3 rounded text-left hover:bg-blue-600 transition">Inventario</button>
+            <button onclick="app.loadView('ventas')" class="w-full flex items-center px-4 py-3 rounded text-left hover:bg-blue-600 transition">Ventas</button>
+            <button onclick="app.loadView('finanzas')" class="w-full flex items-center px-4 py-3 rounded text-left hover:bg-blue-600 transition">Finanzas</button>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full overflow-y-auto">
+        <header class="h-16 bg-white shadow flex items-center px-6 justify-between">
+            <h1 id="view-title" class="text-2xl font-semibold text-gray-700">Dashboard</h1>
+            <div id="loading-indicator" class="hidden text-sm text-blue-600 font-bold animate-pulse">Sincronizando con Google Sheets...</div>
+        </header>
+        
+        <div class="p-6 flex-1">
+            <!-- View: Dashboard -->
+            <div id="view-dashboard" class="view-section block space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded shadow border-t-4 border-blue-500">
+                        <h3 class="text-sm text-gray-500 uppercase">Ingresos Totales</h3>
+                        <p id="dash-ingresos" class="text-3xl font-bold text-gray-800">$0.00</p>
+                    </div>
+                    <div class="bg-white p-6 rounded shadow border-t-4 border-red-500">
+                        <h3 class="text-sm text-gray-500 uppercase">Egresos Totales</h3>
+                        <p id="dash-egresos" class="text-3xl font-bold text-gray-800">$0.00</p>
+                    </div>
+                    <div class="bg-white p-6 rounded shadow border-t-4 border-green-500">
+                        <h3 class="text-sm text-gray-500 uppercase">Balance Neto</h3>
+                        <p id="dash-balance" class="text-3xl font-bold text-gray-800">$0.00</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded shadow w-full h-[400px]">
+                    <canvas id="financeChart"></canvas>
+                </div>
+            </div>
+
+            <!-- View: Inventario -->
+            <div id="view-inventario" class="view-section hidden space-y-4">
+                <div class="flex justify-between items-center">
+                    <input type="text" id="search-inventory" placeholder="Buscar lente, marca, modelo..." class="border p-2 rounded w-1/3 shadow-sm focus:outline-none focus:border-blue-500" onkeyup="app.filterInventory()">
+                    <button onclick="app.toggleModal('modal-inventario')" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700">+ Nuevo Producto</button>
+                </div>
+                <div class="bg-white rounded shadow overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-slate-100 text-slate-600 font-semibold border-b">
+                            <tr>
+                                <th class="p-3">ID</th><th class="p-3">Categoría</th><th class="p-3">Marca/Modelo</th>
+                                <th class="p-3">Esf</th><th class="p-3">Cil</th><th class="p-3">Eje</th>
+                                <th class="p-3">Stock</th><th class="p-3">P. Venta</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-inventory" class="divide-y"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- View: Ventas -->
+            <div id="view-ventas" class="view-section hidden space-y-4">
+                <div class="flex justify-end">
+                    <button onclick="app.toggleModal('modal-ventas')" class="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700">+ Registrar Venta</button>
+                </div>
+                <div class="bg-white rounded shadow overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-slate-100 text-slate-600 font-semibold border-b">
+                            <tr>
+                                <th class="p-3">ID Venta</th><th class="p-3">Fecha</th><th class="p-3">Cliente</th>
+                                <th class="p-3">ID Producto</th><th class="p-3">Cant</th><th class="p-3">Total</th><th class="p-3">Método</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-ventas" class="divide-y"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- View: Finanzas -->
+            <div id="view-finanzas" class="view-section hidden space-y-4">
+                <div class="flex justify-end">
+                    <button onclick="app.toggleModal('modal-egreso')" class="bg-red-600 text-white px-4 py-2 rounded shadow hover:bg-red-700">+ Registrar Egreso</button>
+                </div>
+                <div class="bg-white rounded shadow overflow-x-auto">
+                    <h2 class="p-4 font-bold text-lg bg-gray-50 border-b">Egresos Operativos</h2>
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-slate-100 text-slate-600 font-semibold border-b">
+                            <tr>
+                                <th class="p-3">ID</th><th class="p-3">Fecha</th><th class="p-3">Concepto</th>
+                                <th class="p-3">Categoría</th><th class="p-3">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-egresos" class="divide-y"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal: Nuevo Inventario -->
+    <div id="modal-inventario" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded shadow-lg w-full max-w-2xl">
+            <h2 class="text-xl font-bold mb-4">Añadir al Inventario</h2>
+            <form id="form-inventario" onsubmit="app.submitForm(event, 'Inventario')" class="grid grid-cols-2 gap-4">
+                <input type="text" name="ID" placeholder="ID Producto (Ej: L-001)" class="border p-2 rounded" required>
+                <select name="Categoria" class="border p-2 rounded" required>
+                    <option value="Lente Oftálmico">Lente Oftálmico</option>
+                    <option value="Lente de Contacto">Lente de Contacto</option>
+                    <option value="Armazón">Armazón</option>
+                    <option value="Accesorio">Accesorio</option>
+                </select>
+                <input type="text" name="Marca" placeholder="Marca" class="border p-2 rounded" required>
+                <input type="text" name="Modelo" placeholder="Modelo" class="border p-2 rounded">
+                <input type="text" name="Esfera" placeholder="Esfera (Ej: -1.25)" class="border p-2 rounded">
+                <input type="text" name="Cilindro" placeholder="Cilindro (Ej: -0.50)" class="border p-2 rounded">
+                <input type="text" name="Eje" placeholder="Eje (Ej: 180)" class="border p-2 rounded">
+                <input type="text" name="Adicion" placeholder="Adición" class="border p-2 rounded">
+                <input type="text" name="Curva_Base" placeholder="Curva Base" class="border p-2 rounded">
+                <input type="text" name="Diametro" placeholder="Diámetro" class="border p-2 rounded">
+                <input type="text" name="Indice_Refraccion" placeholder="Índice Ref. (Ej: 1.56)" class="border p-2 rounded">
+                <input type="number" name="Stock" placeholder="Cantidad Stock" class="border p-2 rounded" required>
+                <input type="number" step="0.01" name="Precio_Costo" placeholder="Precio Costo ($)" class="border p-2 rounded" required>
+                <input type="number" step="0.01" name="Precio_Venta" placeholder="Precio Venta ($)" class="border p-2 rounded" required>
+                <div class="col-span-2 flex justify-end space-x-2 mt-4">
+                    <button type="button" onclick="app.toggleModal('modal-inventario')" class="px-4 py-2 bg-gray-300 rounded">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Nueva Venta -->
+    <div id="modal-ventas" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded shadow-lg w-full max-w-md">
+            <h2 class="text-xl font-bold mb-4">Registrar Venta</h2>
+            <form id="form-ventas" onsubmit="app.submitForm(event, 'Ventas')" class="grid grid-cols-1 gap-4">
+                <input type="text" name="ID_Venta" id="auto-id-venta" class="border p-2 rounded bg-gray-100" readonly>
+                <input type="date" name="Fecha" id="venta-fecha" class="border p-2 rounded" required>
+                <input type="text" name="Cliente" placeholder="Nombre del Cliente" class="border p-2 rounded" required>
+                <input type="text" name="ID_Producto" placeholder="ID del Producto" class="border p-2 rounded" required>
+                <input type="number" name="Cantidad" placeholder="Cantidad" class="border p-2 rounded" required>
+                <input type="number" step="0.01" name="Total" placeholder="Monto Total ($)" class="border p-2 rounded" required>
+                <select name="Metodo_Pago" class="border p-2 rounded" required>
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Tarjeta">Tarjeta</option>
+                    <option value="Transferencia">Transferencia</option>
+                </select>
+                <div class="flex justify-end space-x-2 mt-4">
+                    <button type="button" onclick="app.toggleModal('modal-ventas')" class="px-4 py-2 bg-gray-300 rounded">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Registrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Nuevo Egreso -->
+    <div id="modal-egreso" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded shadow-lg w-full max-w-md">
+            <h2 class="text-xl font-bold mb-4">Registrar Egreso</h2>
+            <form id="form-egreso" onsubmit="app.submitForm(event, 'Egresos')" class="grid grid-cols-1 gap-4">
+                <input type="text" name="ID" id="auto-id-egreso" class="border p-2 rounded bg-gray-100" readonly>
+                <input type="date" name="Fecha" id="egreso-fecha" class="border p-2 rounded" required>
+                <input type="text" name="Concepto" placeholder="Concepto del gasto" class="border p-2 rounded" required>
+                <select name="Categoria" class="border p-2 rounded" required>
+                    <option value="Servicios">Servicios</option>
+                    <option value="Insumos Taller">Insumos Taller</option>
+                    <option value="Nómina">Nómina</option>
+                    <option value="Mantenimiento">Mantenimiento</option>
+                    <option value="Otros">Otros</option>
+                </select>
+                <input type="number" step="0.01" name="Monto" placeholder="Monto ($)" class="border p-2 rounded" required>
+                <div class="flex justify-end space-x-2 mt-4">
+                    <button type="button" onclick="app.toggleModal('modal-egreso')" class="px-4 py-2 bg-gray-300 rounded">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Registrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
